@@ -1,0 +1,1 @@
+# build manier: west build -b nucleo_f091rc samples\Weerstation\Weerstation2425
