@@ -1,23 +1,24 @@
-// /* main.c - Application main entry point */
+/* main.c - Application main entry point */
 
-// /*
-//  * Copyright (c) 2017 Intel Corporation
-//  *
-//  * SPDX-License-Identifier: Apache-2.0
-//  */
+/*
+ * Copyright (c) 2017 Intel Corporation
+ *
+ * SPDX-License-Identifier: Apache-2.0
+ */
 
 #include <zephyr/sys/printk.h>
+
 #include <zephyr/settings/settings.h>
 #include <zephyr/devicetree.h>
 #include <zephyr/device.h>
 #include <zephyr/drivers/gpio.h>
 #include <zephyr/drivers/hwinfo.h>
 #include <zephyr/sys/byteorder.h>
+
 #include <zephyr/bluetooth/bluetooth.h>
 #include <zephyr/bluetooth/mesh.h>
-#include <zephyr/kernel.h>
-#include <zephyr/drivers/uart.h>
-#include <string.h>
+#include <zephyr/bluetooth/mesh/shell.h>
+#include <stdlib.h>
 
 #include "board.h"
 
@@ -26,105 +27,41 @@
 #define OP_ONOFF_SET_UNACK BT_MESH_MODEL_OP_2(0x82, 0x03)
 #define OP_ONOFF_STATUS    BT_MESH_MODEL_OP_2(0x82, 0x04)
 
-#define UART_DEVICE_NODE DT_CHOSEN(zephyr_shell_uart)
+static struct bt_mesh_cfg_cli cfg_cli;
 
-#define MSG_SIZE 32
+#if defined(CONFIG_BT_MESH_DFD_SRV)
+static struct bt_mesh_dfd_srv dfd_srv;
+#endif
 
-/* queue to store up to 10 messages (aligned to 4-byte boundary) */
-K_MSGQ_DEFINE(uart_msgq, MSG_SIZE, 10, 4);
+#if defined(CONFIG_BT_MESH_SAR_CFG_CLI)
+static struct bt_mesh_sar_cfg_cli sar_cfg_cli;
+#endif
 
-static const struct device *const uart_dev = DEVICE_DT_GET(UART_DEVICE_NODE);
-static const struct gpio_dt_spec grnLed = GPIO_DT_SPEC_GET(DT_ALIAS(led0), gpios);
+#if defined(CONFIG_BT_MESH_PRIV_BEACON_CLI)
+static struct bt_mesh_priv_beacon_cli priv_beacon_cli;
+#endif
 
-/* receive buffer used in UART ISR callback */
-static char rx_buf[MSG_SIZE];
-static int rx_buf_pos;
+#if defined(CONFIG_BT_MESH_SOL_PDU_RPL_CLI)
+static struct bt_mesh_sol_pdu_rpl_cli srpl_cli;
+#endif
 
-/* Function to initialize GPIO for LED control */
-void led_init(void)
-{
-    if (!device_is_ready(grnLed.port)) {
-        printk("LED device not ready\n");
-        return;
-    }
-    gpio_pin_configure(grnLed.port, grnLed.pin, GPIO_OUTPUT_ACTIVE);
-}
 
-void toggle_led(bool on)
-{
-    gpio_pin_set(grnLed.port, grnLed.pin, on ? 1 : 0);  // Use grnLed.pin
-}
+#if defined(CONFIG_BT_MESH_OD_PRIV_PROXY_CLI)
+static struct bt_mesh_od_priv_proxy_cli od_priv_proxy_cli;
+#endif
 
-void serial_cb(const struct device *dev, void *user_data)
-{
-	uint8_t c;
-
-	if (!uart_irq_update(uart_dev)) {
-		return;
-	}
-
-	if (!uart_irq_rx_ready(uart_dev)) {
-		return;
-	}
-
-	/* read until FIFO empty */
-	while (uart_fifo_read(uart_dev, &c, 1) == 1) {
-		if ((c == '\n' || c == '\r') && rx_buf_pos > 0) {
-			/* terminate string */
-			rx_buf[rx_buf_pos] = '\0';
-
-			/* if queue is full, message is silently dropped */
-			k_msgq_put(&uart_msgq, &rx_buf, K_NO_WAIT);
-
-			/* reset the buffer (it was copied to the msgq) */
-			rx_buf_pos = 0;
-		} else if (rx_buf_pos < (sizeof(rx_buf) - 1)) {
-			rx_buf[rx_buf_pos++] = c;
-		}
-	}
-}
-
-void print_uart(char *buf)
-{
-	int msg_len = strlen(buf);
-
-	for (int i = 0; i < msg_len; i++) {
-		uart_poll_out(uart_dev, buf[i]);
-	}
-}
-
-void uart_init(void)
-{
-    if (!device_is_ready(uart_dev)) {
-        printk("Failed to get UART device binding for %s\n", uart_dev->name);
-        return;
-    }
-
-    printk("UART device %s is ready\n", uart_dev->name);
-
-	int ret = uart_irq_callback_user_data_set(uart_dev, serial_cb, NULL);
-
-	if (ret < 0) {
-		if (ret == -ENOTSUP) {
-			printk("Interrupt-driven UART API support not enabled\n");
-		} else if (ret == -ENOSYS) {
-			printk("UART device does not support interrupt-driven API\n");
-		} else {
-			printk("Error setting UART callback: %d\n", ret);
-		}
-		return 0;
-	}
-	uart_irq_rx_enable(uart_dev);
-}
+#if defined(CONFIG_BT_MESH_LARGE_COMP_DATA_CLI)
+struct bt_mesh_large_comp_data_cli large_comp_data_cli;
+#endif
 
 static void attention_on(const struct bt_mesh_model *mod)
 {
-	toggle_led(true);
+	board_led_set(true);
 }
 
 static void attention_off(const struct bt_mesh_model *mod)
 {
-	toggle_led(false);
+	board_led_set(false);
 }
 
 static const struct bt_mesh_health_srv_cb health_cb = {
@@ -231,14 +168,14 @@ static void onoff_timeout(struct k_work *work)
 		 * progress, regardless of the target value, according to the
 		 * Bluetooth Mesh Model specification, section 3.1.1.
 		 */
-		toggle_led(true);
+		board_led_set(true);
 
 		k_work_reschedule(&onoff.work, K_MSEC(onoff.transition_time));
 		onoff.transition_time = 0;
 		return;
 	}
 
-	toggle_led(onoff.val);
+	board_led_set(onoff.val);
 }
 
 /* Generic OnOff Server message handlers */
@@ -347,6 +284,63 @@ static const struct bt_mesh_model models[] = {
 		      NULL),
 	BT_MESH_MODEL(BT_MESH_MODEL_ID_GEN_ONOFF_CLI, gen_onoff_cli_op, NULL,
 		      NULL),
+			  #if defined(CONFIG_BT_MESH_DFD_SRV)
+	BT_MESH_MODEL_DFD_SRV(&dfd_srv),
+#else
+#if defined(CONFIG_BT_MESH_SHELL_DFU_SRV)
+	BT_MESH_MODEL_DFU_SRV(&bt_mesh_shell_dfu_srv),
+#elif defined(CONFIG_BT_MESH_SHELL_BLOB_SRV)
+	BT_MESH_MODEL_BLOB_SRV(&bt_mesh_shell_blob_srv),
+#endif
+#if defined(CONFIG_BT_MESH_SHELL_DFU_CLI)
+	BT_MESH_MODEL_DFU_CLI(&bt_mesh_shell_dfu_cli),
+#elif defined(CONFIG_BT_MESH_SHELL_BLOB_CLI)
+	BT_MESH_MODEL_BLOB_CLI(&bt_mesh_shell_blob_cli),
+#endif
+#endif /* CONFIG_BT_MESH_DFD_SRV */
+#if defined(CONFIG_BT_MESH_SHELL_RPR_CLI)
+	BT_MESH_MODEL_RPR_CLI(&bt_mesh_shell_rpr_cli),
+#endif
+#if defined(CONFIG_BT_MESH_RPR_SRV)
+	BT_MESH_MODEL_RPR_SRV,
+#endif
+
+#if defined(CONFIG_BT_MESH_SAR_CFG_SRV)
+	BT_MESH_MODEL_SAR_CFG_SRV,
+#endif
+#if defined(CONFIG_BT_MESH_SAR_CFG_CLI)
+	BT_MESH_MODEL_SAR_CFG_CLI(&sar_cfg_cli),
+#endif
+
+#if defined(CONFIG_BT_MESH_OP_AGG_SRV)
+	BT_MESH_MODEL_OP_AGG_SRV,
+#endif
+#if defined(CONFIG_BT_MESH_OP_AGG_CLI)
+	BT_MESH_MODEL_OP_AGG_CLI,
+#endif
+
+#if defined(CONFIG_BT_MESH_LARGE_COMP_DATA_SRV)
+	BT_MESH_MODEL_LARGE_COMP_DATA_SRV,
+#endif
+#if defined(CONFIG_BT_MESH_LARGE_COMP_DATA_CLI)
+	BT_MESH_MODEL_LARGE_COMP_DATA_CLI(&large_comp_data_cli),
+#endif
+
+#if defined(CONFIG_BT_MESH_PRIV_BEACON_SRV)
+	BT_MESH_MODEL_PRIV_BEACON_SRV,
+#endif
+#if defined(CONFIG_BT_MESH_PRIV_BEACON_CLI)
+	BT_MESH_MODEL_PRIV_BEACON_CLI(&priv_beacon_cli),
+#endif
+#if defined(CONFIG_BT_MESH_OD_PRIV_PROXY_CLI)
+	BT_MESH_MODEL_OD_PRIV_PROXY_CLI(&od_priv_proxy_cli),
+#endif
+#if defined(CONFIG_BT_MESH_SOL_PDU_RPL_CLI)
+	BT_MESH_MODEL_SOL_PDU_RPL_CLI(&srpl_cli),
+#endif
+#if defined(CONFIG_BT_MESH_OD_PRIV_PROXY_SRV)
+	BT_MESH_MODEL_OD_PRIV_PROXY_SRV,
+#endif
 };
 
 static const struct bt_mesh_elem elements[] = {
@@ -468,7 +462,7 @@ static void button_pressed(struct k_work *work)
 
 static void bt_ready(int err)
 {
-	if (err) {
+	if (err && err != -EALREADY) {
 		printk("Bluetooth init failed (err %d)\n", err);
 		return;
 	}
@@ -489,13 +483,19 @@ static void bt_ready(int err)
 	bt_mesh_prov_enable(BT_MESH_PROV_ADV | BT_MESH_PROV_GATT);
 
 	printk("Mesh initialized\n");
+
+	if (bt_mesh_is_provisioned()) {
+		printk("Mesh network restored from flash\n");
+	} else {
+		printk("Use \"prov pb-adv on\" or \"prov pb-gatt on\" to "
+			    "enable advertising\n");
+	}
 }
 
 int main(void)
 {
 	static struct k_work button_work;
-	int err = -1;    
-	char tx_buf[MSG_SIZE];
+	int err = -1;
 
 	printk("Initializing...\n");
 
@@ -508,11 +508,6 @@ int main(void)
 		dev_uuid[1] = 0xdd;
 	}
 
-	printk("Starting UART LED control program\n");
-
-    led_init();  // Initialize LED control
-    uart_init(); // Initialize UART communication
-
 	k_work_init(&button_work, button_pressed);
 
 	err = board_init(&button_work);
@@ -523,25 +518,10 @@ int main(void)
 
 	k_work_init_delayable(&onoff.work, onoff_timeout);
 
-
 	/* Initialize the Bluetooth Subsystem */
 	err = bt_enable(bt_ready);
 	if (err) {
 		printk("Bluetooth init failed (err %d)\n", err);
 	}
-
-
-	while (k_msgq_get(&uart_msgq, &tx_buf, K_FOREVER) == 0) {
-		/* else: characters beyond buffer size are dropped */
-		if (tx_buf[0] == 'O') {
-			printk("Received 'O' - Turning LED ON\n");
-			toggle_led(true);
-		}   else if (tx_buf[0] == 'F') {
-			printk("Received 'F' - Turning LED OFF\n");
-			toggle_led(false);
-		}
-    }
-
-
 	return 0;
 }
