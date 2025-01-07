@@ -34,11 +34,12 @@ def remove_node():
     if selected_node:
         node_listbox.delete(selected_node)  # Verwijder de geselecteerde node
 
-def led0_on():
-        send_serial_command("led0aan")
 
 def led1_on():
         send_serial_command("led1aan")
+
+def led0_toggle():
+        send_serial_command("toggle")
 
 def main():
     # Maak het hoofdvenster
@@ -80,13 +81,13 @@ def main():
     quit_button = tk.Button(root, text="Afsluiten", command=root.quit)
     quit_button.pack(pady=5)
 
-    # Voeg een knop toe om het venster af te sluiten
-    led1 = tk.Button(root, text="LED 0", command=led0_on)
-    led1.pack(pady=5)
-
-    # Voeg een knop toe om het venster af te sluiten
+    # Voeg een knop toe om led 1 aan te zetten
     led2 = tk.Button(root, text="LED 1", command=led1_on)
     led2.pack(pady=5)
+
+    # Voeg een knop toe om led 1 aan te zetten
+    led0 = tk.Button(root, text="LED 0 MESH", command=led0_toggle)
+    led0.pack(pady=5)
 
     # Start de GUI-lus
     root.mainloop()
