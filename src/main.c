@@ -325,7 +325,7 @@ static void button_pressed(struct k_work *work)
 		(void)gen_onoff_send(!onoff.val);
 		return;
 	}
-
+/////////////////////////////////////////////////self provisioning////////////////////////////////////
 	/* Self-provision with an arbitrary address.
 	 *
 	 * NOTE: This should never be done in a production environment.
@@ -367,6 +367,8 @@ static void button_pressed(struct k_work *work)
 
 	printk("Provisioned and configured!\n");
 }
+////////////////////////////////////////einde self provisioning/////////////////////////////////////////
+
 
 static void bt_ready(int err)
 {
