@@ -37,6 +37,12 @@ static struct led_onoff_state led_onoff_state = {
     .previous = 0,
 };
 
+static const struct gpio_dt_spec sw_device = {
+	GPIO_DT_SPEC_GET(DT_ALIAS(sw0), gpios)
+};
+
+static struct gpio_callback button_cb;
+
 static int gen_onoff_get(const struct bt_mesh_model *model,
                          struct bt_mesh_msg_ctx *ctx,
                          struct net_buf_simple *buf)
@@ -95,6 +101,11 @@ static const struct bt_mesh_model_op gen_onoff_srv_op[] = {
     BT_MESH_MODEL_OP_END,
 };
 
+static const struct bt_mesh_model_op gen_onoff_cli_op[] = {
+	{ BT_MESH_MODEL_OP_GEN_ONOFF_STATUS, BT_MESH_LEN_EXACT(1), gen_onoff_status },
+	BT_MESH_MODEL_OP_END,
+};
+
 #if defined(CONFIG_BT_MESH_DFD_SRV)
 static struct bt_mesh_dfd_srv dfd_srv;
 #endif
@@ -131,6 +142,8 @@ static const struct bt_mesh_model root_models[] = {
 	BT_MESH_MODEL_HEALTH_CLI(&bt_mesh_shell_health_cli),
     BT_MESH_MODEL(BT_MESH_MODEL_ID_GEN_ONOFF_SRV, gen_onoff_srv_op,
                   &gen_onoff_pub_srv, NULL),
+	BT_MESH_MODEL(BT_MESH_MODEL_ID_GEN_ONOFF_CLI, gen_onoff_cli_op,
+		      NULL, NULL),
 #if defined(CONFIG_BT_MESH_DFD_SRV)
 	BT_MESH_MODEL_DFD_SRV(&dfd_srv),
 #else
@@ -200,6 +213,17 @@ static const struct bt_mesh_comp comp = {
 	.elem_count = ARRAY_SIZE(elements),
 };
 
+static void button_pressed(struct k_work *work)
+{
+	if (bt_mesh_is_provisioned()) {
+		(void)gen_onoff_send(!onoff.val);
+		return;
+	}
+
+	models[2].keys[0] = 0;
+	models[3].keys[0] = 0;
+}
+
 static void bt_ready(int err)
 {
 	if (err && err != -EALREADY) {
@@ -231,6 +255,7 @@ static void bt_ready(int err)
 
 int main(void)
 {
+    static struct k_work button_work;
 	int err;
 
 	printk("Initializing...\n");
@@ -241,7 +266,11 @@ int main(void)
         return -1;
     }
 
+    k_work_init(&button_work, button_pressed);
+
     gpio_pin_configure_dt(&led_onoff_state.led_device, GPIO_OUTPUT_INACTIVE);
+    gpio_pin_configure_dt(&led_onoff_state.sw_device, GPIO_INPUT);
+    k_work_init_delayable(&onoff.work, onoff_timeout);
 
 	/* Initialize the Bluetooth Subsystem */
 	err = bt_enable(bt_ready);
@@ -249,7 +278,6 @@ int main(void)
 		printk("Bluetooth init failed (err %d)\n", err);
 	}
     
-
 	printk("Press the <Tab> button for supported commands.\n");
 	printk("Before any Mesh commands you must run \"mesh init\"\n");
 	return 0;
