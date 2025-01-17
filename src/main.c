@@ -367,6 +367,28 @@ static void button_init(void)
     printk("Button initialized\n");
 }
 
+void enable_ADV(void)
+{
+	int err;
+	err = bt_mesh_prov_enable(BT_MESH_PROV_ADV);
+	if (err != 0) {
+		printk("ADV initialization failed\n");
+	}  else {
+		printk("ADV initialized\n");
+	}
+}
+
+void disable_ADV(void)
+{
+	int err;
+	err = bt_mesh_prov_disable(BT_MESH_PROV_ADV);
+	if (err != 0) {
+		printk("ADV disabling failed\n");
+	}  else {
+		printk("ADV disabled\n");
+	}
+}
+
 static void bt_ready(int err)
 {
 	if (err && err != -EALREADY) {
@@ -388,8 +410,11 @@ static void bt_ready(int err)
 
 	printk("Mesh initialized\n");
 
+	enable_ADV();
+
 	if (bt_mesh_is_provisioned()) {
 		printk("Mesh network restored from flash\n");
+		disable_ADV();
 	} else {
 		printk("Use \"prov pb-adv on\" or \"prov pb-gatt on\" to "
 			    "enable advertising\n");
@@ -404,7 +429,7 @@ int main(void)
 
     /* Initialize LED */
     if (!gpio_is_ready_dt(&led_onoff_state.led_device)) {
-        printk("Error: LED device is not ready\n");
+        printk("LED device not ready\n");
         return -1;
     }
 
