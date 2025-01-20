@@ -7,7 +7,6 @@
 #include <zephyr/sys/printk.h>
 #include <stdlib.h>
 #include <zephyr/kernel.h>
-
 #include <zephyr/shell/shell.h>
 #include <zephyr/device.h>
 #include <zephyr/drivers/gpio.h>
@@ -365,6 +364,50 @@ static void button_init(void)
 
     printk("Button initialized\n");
 }
+
+static int send_onoff_get(uint16_t addr)
+{
+    struct bt_mesh_msg_ctx ctx = {
+        .net_idx = root_models[5].keys[0],  // Network Key Index
+        .app_idx = root_models[5].keys[0], // Application Key Index
+        .addr = addr,                      // Target address
+        .send_ttl = BT_MESH_TTL_DEFAULT,
+    };
+
+    BT_MESH_MODEL_BUF_DEFINE(buf, BT_MESH_MODEL_OP_GEN_ONOFF_GET, 0);
+    bt_mesh_model_msg_init(&buf, BT_MESH_MODEL_OP_GEN_ONOFF_GET);
+
+    printk("Sending OnOff Get to 0x%04x\n", addr);
+
+    return bt_mesh_model_send(&root_models[5], &ctx, &buf, NULL, NULL);
+}
+
+static int cmd_send_onoff_get(const struct shell *shell, size_t argc, char **argv)
+{
+    if (argc != 2) {
+        shell_print(shell, "Usage: send_onoff_get <address>");
+        return -EINVAL;
+    }
+
+    char *endptr;
+    uint16_t addr = strtoul(argv[1], &endptr, 16);
+
+    if (*endptr != '\0') {
+        shell_print(shell, "Invalid address format");
+        return -EINVAL;
+    }
+
+    int err = send_onoff_get(addr);
+    if (err) {
+        shell_print(shell, "Failed to send OnOff Get (err %d)", err);
+    } else {
+        shell_print(shell, "OnOff Get sent to 0x%04x", addr);
+    }
+
+    return err;
+}
+
+SHELL_CMD_ARG_REGISTER(send_onoff_get, NULL, "Send Generic OnOff Get <address>", cmd_send_onoff_get, 2, 0);
 
 static void bt_ready(int err)
 {
