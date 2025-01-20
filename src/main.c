@@ -159,6 +159,7 @@ static int gen_onoff_status(const struct bt_mesh_model *model,
                             struct net_buf_simple *buf)
 {
 	uint8_t present = net_buf_simple_pull_u8(buf);
+	printk("Received OnOff Status: %s\n", present ? "ON" : "OFF");
     struct led_onoff_state *state = &led_onoff_state;
 
 	if (buf->len) {
