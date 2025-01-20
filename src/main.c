@@ -122,22 +122,10 @@ static int gen_onoff_get(const struct bt_mesh_model *model,
                          struct bt_mesh_msg_ctx *ctx,
                          struct net_buf_simple *buf)
 {
-    NET_BUF_SIMPLE_DEFINE(msg, 2 + 1 + 4);
     struct led_onoff_state *state = &led_onoff_state;
-
     printk("OnOff Get: LED state is %u\n", state->current);
-
-    bt_mesh_model_msg_init(&msg, BT_MESH_MODEL_OP_GEN_ONOFF_STATUS);
-    net_buf_simple_add_u8(&msg, state->current);
-    // onoff_status_send(model, ctx);
-
-    int err = bt_mesh_model_send(model, ctx, &msg, NULL, NULL);
-    if (err) {
-        printk("Unable to send OnOff Status response (err %d)\n", err);
-        return err;
-    }
-
-    return 0;
+    
+    return onoff_status_send(model, ctx);
 }
 
 static int gen_onoff_set(const struct bt_mesh_model *model,
@@ -168,21 +156,14 @@ static int gen_onoff_status(const struct bt_mesh_model *model,
     // Ensure led_onoff_state is initialized (assuming it's globally defined somewhere)
     struct led_onoff_state *state = &led_onoff_state;
 
-    // If there's additional information (target state and remaining time)
-    if (buf->len) {
-        uint8_t target = net_buf_simple_pull_u8(buf);  // Get the target state
-        int32_t remaining_time = model_time_decode(net_buf_simple_pull_u8(buf));  // Get remaining time for transition
-
-        printk("OnOff status: %s -> %s: (%d ms)\n",
-               onoff_str[state->current],  // Current state
-               onoff_str[target],  // Target state
-               remaining_time);  // Transition time (in ms)
-        
-        // You might want to update state->current based on the target state
-        state->current = target;
-
-        return 0;
-    }
+    if (buf->len >= 3) {  // At least 3 bytes: Present, Target, Remaining Time
+    uint8_t target = net_buf_simple_pull_u8(buf);
+    int32_t remaining_time = model_time_decode(net_buf_simple_pull_u8(buf));
+    printk("OnOff status: %s -> %s (%d ms)\n",
+           onoff_str[present], onoff_str[target], remaining_time);
+	} else {
+		printk("OnOff status: %s\n", onoff_str[present]);
+	}
 
     // If no target state or time is provided, just print the current state
     printk("OnOff status: %s\n", onoff_str[state->current]);
