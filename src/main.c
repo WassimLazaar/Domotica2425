@@ -129,10 +129,12 @@ static int gen_onoff_get(const struct bt_mesh_model *model,
 
     bt_mesh_model_msg_init(&msg, BT_MESH_MODEL_OP_GEN_ONOFF_STATUS);
     net_buf_simple_add_u8(&msg, state->current);
-    onoff_status_send(model, ctx);
+    // onoff_status_send(model, ctx);
 
-    if (bt_mesh_model_send(model, ctx, &msg, NULL, NULL)) {
-        printk("Unable to send OnOff Status response\n");
+    int err = bt_mesh_model_send(model, ctx, &msg, NULL, NULL);
+    if (err) {
+        printk("Unable to send OnOff Status response (err %d)\n", err);
+        return err;
     }
 
     return 0;
