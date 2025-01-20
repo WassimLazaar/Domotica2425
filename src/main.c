@@ -23,7 +23,6 @@
 #define BT_MESH_MODEL_OP_GEN_ONOFF_SET_UNACK BT_MESH_MODEL_OP_2(0x82, 0x03)
 #define BT_MESH_MODEL_OP_GEN_ONOFF_STATUS    BT_MESH_MODEL_OP_2(0x82, 0x04)
 
-
 static struct bt_mesh_cfg_cli cfg_cli;
 
 static const char *onoff_str[] = { "Off", "On" };

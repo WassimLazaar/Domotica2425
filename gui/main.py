@@ -3,7 +3,7 @@ import serial
 import threading
 import time
 
-ser = serial.Serial('COM3', 115200, timeout=1)
+ser = serial.Serial('COM0', 115200, timeout=1)
 
 def send_command():
     command = command_entry.get()
@@ -14,9 +14,15 @@ def send_command():
 
 def send_serial_command(command):
     """Functie om een command via de seriële poort te verzenden."""
-    ser.write((command + '\n').encode('utf-8'))
+    ser.write((command + "\r\n").encode('utf-8'))
     print(f"Verzonden: {command}")
     time.sleep(0.1)  # Simuleer enige verwerkingstijd
+
+    response = ser.read(ser.in_waiting or 1).decode('utf-8')
+    if response:
+        output_text.insert(tk.END, f"Response: {response}\n")
+    else:
+        output_text.insert(tk.END, "No response from device\n")
 
 def close_serial():
     ser.close()
@@ -35,10 +41,11 @@ def remove_node():
         node_listbox.delete(selected_node)  # Verwijder de geselecteerde node
 
 
-def led1_on():
-        send_serial_command("led1aan")
+def gen_server_on():
+        send_serial_command("Mesh target dst <address>")
+        send_serial_command("Mesh test net-send 82020100")
 
-def led0_toggle():
+def gen_server_off():
         send_serial_command("toggle")
 
 def main():
@@ -70,6 +77,11 @@ def main():
     node_entry = tk.Entry(root, width=30)
     node_entry.pack(pady=5)
 
+    # Serial Output
+    global output_text
+    output_text = tk.Text(root, height=10, width=50)
+    output_text.pack(pady=10)
+
     # Voeg een knop toe om een node toe te voegen aan de lijstbox
     add_button = tk.Button(root, text="Voeg Node Toe", command=add_node)
     add_button.pack(pady=5)
@@ -82,11 +94,11 @@ def main():
     quit_button.pack(pady=5)
 
     # Voeg een knop toe om led 1 aan te zetten
-    led2 = tk.Button(root, text="LED 1", command=led1_on)
+    led2 = tk.Button(root, text="TURN LED ON", command=gen_server_on)
     led2.pack(pady=5)
 
     # Voeg een knop toe om led 1 aan te zetten
-    led0 = tk.Button(root, text="LED 0 MESH", command=led0_toggle)
+    led0 = tk.Button(root, text="TURN LED OFF", command=gen_server_off)
     led0.pack(pady=5)
 
     # Start de GUI-lus
