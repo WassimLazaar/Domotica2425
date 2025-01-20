@@ -367,10 +367,11 @@ static void button_init(void)
 
 static int send_onoff_get(uint16_t addr)
 {
+    struct bt_mesh_model *model = &root_models[5];  // Adjust to match the Generic OnOff Client model
     struct bt_mesh_msg_ctx ctx = {
-        .net_idx = root_models[5].keys[0],  // Network Key Index
-        .app_idx = root_models[5].keys[0], // Application Key Index
-        .addr = addr,                      // Target address
+        .net_idx = model->keys[0],  // Network Key Index
+        .app_idx = model->keys[0], // Application Key Index
+        .addr = addr,              // Target address
         .send_ttl = BT_MESH_TTL_DEFAULT,
     };
 
@@ -379,7 +380,7 @@ static int send_onoff_get(uint16_t addr)
 
     printk("Sending OnOff Get to 0x%04x\n", addr);
 
-    return bt_mesh_model_send(&root_models[5], &ctx, &buf, NULL, NULL);
+    return bt_mesh_model_send(model, &ctx, &buf, NULL, NULL);
 }
 
 static int cmd_send_onoff_get(const struct shell *shell, size_t argc, char **argv)
