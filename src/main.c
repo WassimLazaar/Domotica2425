@@ -162,22 +162,32 @@ static int gen_onoff_status(const struct bt_mesh_model *model,
                             struct bt_mesh_msg_ctx *ctx,
                             struct net_buf_simple *buf)
 {
-	uint8_t present = net_buf_simple_pull_u8(buf);
+    uint8_t present = net_buf_simple_pull_u8(buf);  // Get the current OnOff state
+    printk("Received OnOff Status: %s\n", present ? "ON" : "OFF");
+
+    // Ensure led_onoff_state is initialized (assuming it's globally defined somewhere)
     struct led_onoff_state *state = &led_onoff_state;
 
-	if (buf->len) {
-		uint8_t target = net_buf_simple_pull_u8(buf);
-		int32_t remaining_time =
-			model_time_decode(net_buf_simple_pull_u8(buf));
+    // If there's additional information (target state and remaining time)
+    if (buf->len) {
+        uint8_t target = net_buf_simple_pull_u8(buf);  // Get the target state
+        int32_t remaining_time = model_time_decode(net_buf_simple_pull_u8(buf));  // Get remaining time for transition
 
-		printk("OnOff status: %s -> %s: (%d ms)\n", onoff_str[state->current],
-		       onoff_str[state->current], remaining_time);
-		return 0;
-	}
+        printk("OnOff status: %s -> %s: (%d ms)\n",
+               onoff_str[state->current],  // Current state
+               onoff_str[target],  // Target state
+               remaining_time);  // Transition time (in ms)
+        
+        // You might want to update state->current based on the target state
+        state->current = target;
 
-	printk("OnOff status: %s\n", onoff_str[state->current]);
+        return 0;
+    }
 
-	return 0;
+    // If no target state or time is provided, just print the current state
+    printk("OnOff status: %s\n", onoff_str[state->current]);
+
+    return 0;
 }
 
 static int gen_onoff_set_unack(const struct bt_mesh_model *model,
