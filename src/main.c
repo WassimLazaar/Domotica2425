@@ -158,23 +158,18 @@ static int gen_onoff_status(const struct bt_mesh_model *model,
                             struct bt_mesh_msg_ctx *ctx,
                             struct net_buf_simple *buf)
 {
-	uint8_t present = net_buf_simple_pull_u8(buf);
-	printk("Received OnOff Status: %s\n", present ? "ON" : "OFF");
-    struct led_onoff_state *state = &led_onoff_state;
+    uint8_t present = net_buf_simple_pull_u8(buf);
+    printk("OnOff Status Received from 0x%04x: %s\n", ctx->addr, present ? "ON" : "OFF");
 
-	if (buf->len) {
-		uint8_t target = net_buf_simple_pull_u8(buf);
-		int32_t remaining_time =
-			model_time_decode(net_buf_simple_pull_u8(buf));
+    if (buf->len >= 2) { // Optional fields: Target and Remaining Time
+        uint8_t target = net_buf_simple_pull_u8(buf);
+        uint32_t remaining_time = model_time_decode(net_buf_simple_pull_u8(buf));
 
-		printk("OnOff status: %s -> %s: (%d ms)\n", onoff_str[state->current],
-		       onoff_str[state->current], remaining_time);
-		return 0;
-	}
+        printk("Target: %s, Remaining Time: %u ms\n",
+               target ? "ON" : "OFF", remaining_time);
+    }
 
-	printk("OnOff status: %s\n", onoff_str[state->current]);
-
-	return 0;
+    return 0;
 }
 
 static int gen_onoff_set_unack(const struct bt_mesh_model *model,
@@ -368,7 +363,7 @@ static void button_init(void)
 
 static int send_onoff_get(uint16_t addr)
 {
-    struct bt_mesh_model *model = &root_models[5];  // Adjust to match the Generic OnOff Client model
+    const struct bt_mesh_model *model = &root_models[5];  // Adjust to match the Generic OnOff Client model
     struct bt_mesh_msg_ctx ctx = {
         .net_idx = model->keys[0],  // Network Key Index
         .app_idx = model->keys[0], // Application Key Index
