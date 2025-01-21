@@ -26,7 +26,7 @@ static struct bt_mesh_cfg_cli cfg_cli;
 
 static const char *onoff_str[] = { "Off", "On" };
 
-/* Generic OnOff Server State */
+// Generic OnOff Server State 
 struct led_onoff_state {
     const struct gpio_dt_spec led_device;
     uint8_t current;
@@ -100,17 +100,12 @@ static int onoff_status_send(const struct bt_mesh_model *model,
 			    k_work_delayable_remaining_get(&onoff.work)) +
 		    onoff.transition_time;
 
-	/* Check using remaining time instead of "work pending" to make the
-	 * onoff status send the right value on instant transitions. As the
-	 * work item is executed in a lower priority than the mesh message
-	 * handler, the work will be pending even on instant transitions.
-	 */
 	if (remaining) {
-		net_buf_simple_add_u8(&buf, !onoff.val);
-		net_buf_simple_add_u8(&buf, onoff.val);
+		net_buf_simple_add_u8(&buf, !led_onoff_state.current);
+		net_buf_simple_add_u8(&buf, led_onoff_state.current);
 		net_buf_simple_add_u8(&buf, model_time_encode(remaining));
 	} else {
-		net_buf_simple_add_u8(&buf, onoff.val);
+		net_buf_simple_add_u8(&buf, led_onoff_state.current);
 	}
 
 	return bt_mesh_model_send(model, ctx, &buf, NULL, NULL);
@@ -146,10 +141,9 @@ static int gen_onoff_set(const struct bt_mesh_model *model,
     printk("OnOff Set: Setting LED state to %u\n", new_state);
 
     state->current = new_state;
+    onoff.val = new_state;
     gpio_pin_set_dt(&state->led_device, state->current);
     onoff_status_send(model, ctx);
-
-    gen_onoff_get(model, ctx, buf);
 
     return 0;
 }
@@ -161,7 +155,7 @@ static int gen_onoff_status(const struct bt_mesh_model *model,
     uint8_t present = net_buf_simple_pull_u8(buf);
     printk("OnOff Status Received from 0x%04x: %s\n", ctx->addr, present ? "ON" : "OFF");
 
-    if (buf->len >= 2) { // Optional fields: Target and Remaining Time
+    if (buf->len >= 2) { 
         uint8_t target = net_buf_simple_pull_u8(buf);
         uint32_t remaining_time = model_time_decode(net_buf_simple_pull_u8(buf));
 
@@ -172,6 +166,7 @@ static int gen_onoff_status(const struct bt_mesh_model *model,
     return 0;
 }
 
+//button set unack
 static int gen_onoff_set_unack(const struct bt_mesh_model *model,
                                struct bt_mesh_msg_ctx *ctx,
                                struct net_buf_simple *buf)
@@ -182,6 +177,7 @@ static int gen_onoff_set_unack(const struct bt_mesh_model *model,
     printk("OnOff Set Unack: Setting LED state to %u\n", new_state);
 
     state->current = new_state;
+    onoff.val = new_state;
     gpio_pin_set_dt(&state->led_device, state->current);
 
     return 0;
@@ -195,7 +191,7 @@ static const struct bt_mesh_model_op gen_onoff_srv_op[] = {
 };
 
 static const struct bt_mesh_model_op gen_onoff_cli_op[] = {
-    { BT_MESH_MODEL_OP_GEN_ONOFF_STATUS, BT_MESH_LEN_EXACT(1), gen_onoff_status },
+    { BT_MESH_MODEL_OP_GEN_ONOFF_STATUS, BT_MESH_LEN_EXACT(1), gen_onoff_status }, // calls gen_onoff_status function
     BT_MESH_MODEL_OP_END,
 };
 
