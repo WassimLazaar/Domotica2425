@@ -13,12 +13,11 @@ group_count = 1
 selected_address = None  # Variabele om geselecteerd adres op te slaan
 selected_group = None  # Variabele om geselecteerd adres op te slaan
 
-
-def send_command():
-    command = command_entry.get()
-    if command:
-        # Start een nieuwe thread voor het verzenden van het command
-        threading.Thread(target=send_serial_command, args=(command,)).start()
+# def send_command():
+#     command = command_entry.get()
+#     if command:
+#         # Start een nieuwe thread voor het verzenden van het command
+#         threading.Thread(target=send_serial_command, args=(command,)).start()
 
 def send_serial_command(command):
     """Functie om een command via de seriële poort te verzenden."""
@@ -50,6 +49,12 @@ def reset_serial_buffers():
     except Exception as e:
         print(f"Failed to reset serial buffers: {e}")
 
+def add_model():
+    model_str = f"0x1000"
+    model_listbox.insert(tk.END, f"Gen_OnOff_svr: ({model_str})")
+    model_str = f"0x1001"
+    model_listbox.insert(tk.END, f"Gen_OnOff_cli: ({model_str})")
+
 def create_group():    
     global next_group
     global group_count
@@ -57,6 +62,13 @@ def create_group():
     group_listbox.insert(tk.END, f"group{group_count}: ({group_str})")  # Voeg adres toe aan lijst
     group_count += 1
     next_group += 1
+
+def sub_group():
+    global selected_address
+    global selected_group
+    global selected_model
+    sending = f"mesh models cfg model sub-add {selected_address} {selected_group} {selected_model}"
+    send_serial_command(sending)
 
 def remove_node():
     selected_node = node_listbox.curselection()  # Haal de geselecteerde node op
@@ -92,12 +104,27 @@ def on_group_select(event):
         sending = f"mesh target dst {selected_group}"
         send_serial_command(sending)
 
+def on_model_select(event):
+    """Functie die wordt aangeroepen wanneer een node wordt geselecteerd."""
+    global selected_model
+
+    selected_index = model_listbox.curselection()
+    if selected_index:
+        selected_model = model_listbox.get(selected_index[0])
+        
+        # Extract het adres uit de string "Node: 0x0002" → "0x0002"
+        address = selected_model.split("(")[-1].strip(")")
+        selected_model = address  # Opslaan voor gebruik
+
 
 def led_on():
     send_serial_command("mesh test net-send 82020100") #led on 
 
 def led_off():
     send_serial_command("mesh test net-send 82020000") #led off
+
+def get_status():
+    send_serial_command("mesh test nes-send 8201") #get status
 
 
 def init_pr():
@@ -162,8 +189,6 @@ def appkey_add():
 
     sending = "mesh init"
     send_serial_command(sending)
-    sending = f"mesh target dst {selected_group}"
-    send_serial_command(sending)
     sending = "mesh models cfg appkey add 0 0"
     send_serial_command(sending)
     time.sleep(0.1)
@@ -193,82 +218,100 @@ def remote_prov():
     next_address += 1  # Increment the address for the next node
 
 def main():
-    # Maak het hoofdvenster
     root = tk.Tk()
     root.title("TUI Domotica 2024/2025")
-    root.geometry("400x550")  # Stel de grootte van het venster in
+    root.geometry("1000x800")  # Set the window size
+    
+    # Set black background for the window
+    root.configure(bg='#222222')
 
-    # Voeg een label toe met de tekst "TUI Domotica 2024/2025"
-    label = tk.Label(root, text="TUI Domotica 2024/2025", font=("Arial", 16))
-    label.pack(pady=10)
+    root.grid_rowconfigure(0, weight=0)  # Top space (label)
+    root.grid_rowconfigure(1, weight=0)  # Listboxes
+    root.grid_rowconfigure(2, weight=0)  # Buttons
+    root.grid_rowconfigure(3, weight=0)  # Empty row between buttons and output
+    root.grid_rowconfigure(4, weight=1)  # Output area (more space)
 
-    # Voeg een invoerveld toe voor de command-string
-    global command_entry
-    command_entry = tk.Entry(root, width=30)
-    command_entry.pack(pady=10)
+    root.grid_columnconfigure(0, weight=1)  # Left space
+    root.grid_columnconfigure(1, weight=1)  # Center space for the widgets
+    root.grid_columnconfigure(2, weight=1)  # Right space
 
-    # Voeg een knop toe om de command-string te versturen
-    send_button = tk.Button(root, text="Verstuur Command", command=send_command)
-    send_button.pack(pady=5)
+    # Add a label at the top
+    label = tk.Label(root, text="TUI Domotica 2024/2025", font=('Helvetica', 20, 'bold'), fg='white', bg='#222222')
+    label.grid(row=0, column=0, columnspan=3, pady=10)
 
-    # Voeg een frame toe om de lijstboxen naast elkaar te plaatsen
-    listbox_frame = tk.Frame(root)
-    listbox_frame.pack(pady=10)
+    # Create a frame for the Listboxes
+    listbox_frame = tk.Frame(root, bg='#222222')
+    listbox_frame.grid(row=1, column=0, columnspan=3, padx=10, pady=10)
 
-    # Voeg een lijstbox toe om nodes weer te geven
-    global node_listbox  # Maak de lijstbox globaal beschikbaar
-    node_listbox = tk.Listbox(listbox_frame, height=8, width=40)
-    node_listbox.pack(side=tk.LEFT, padx=5)  # Plaats naast elkaar
-    node_listbox.bind("<<ListboxSelect>>", on_node_select)  # Bind de selectie aan de event-handler
+    # Add a Listbox to display nodes
+    global node_listbox
+    node_listbox = tk.Listbox(listbox_frame, height=10, width=30, bg='#222222', fg='white')
+    node_listbox.grid(row=0, column=0, padx=5, pady=5)
+    node_listbox.bind("<<ListboxSelect>>", on_node_select)
 
-    # Voeg een lijstbox toe om groups weer te geven
-    global group_listbox  # Maak de lijstbox globaal beschikbaar
-    group_listbox = tk.Listbox(listbox_frame, height=8, width=40)
-    group_listbox.pack(side=tk.LEFT, padx=5)  # Plaats naast elkaar
-    group_listbox.bind("<<ListboxSelect>>", on_group_select)  # Bind de selectie aan de event-handler
+    # Add a Listbox to display groups
+    global group_listbox
+    group_listbox = tk.Listbox(listbox_frame, height=10, width=30, bg='#222222', fg='white')
+    group_listbox.grid(row=0, column=1, padx=5, pady=5)
+    group_listbox.bind("<<ListboxSelect>>", on_group_select)
 
-    remove_button = tk.Button(root, text="Verwijder Geselecteerde Node", command=remove_node)
-    remove_button.pack(pady=5)
+    # Add a Listbox to display models
+    global model_listbox
+    model_listbox = tk.Listbox(listbox_frame, height=10, width=30, bg='#222222', fg='white')
+    model_listbox.grid(row=0, column=2, padx=5, pady=5)
+    model_listbox.bind("<<ListboxSelect>>", on_model_select)
 
-    # Voeg een knop toe om led aan te zetten
-    ledon = tk.Button(root, text="LED on", command=led_on)
-    ledon.pack(pady=5)
+    # Create a frame for the buttons
+    button_frame = tk.Frame(root, bg='#222222')
+    button_frame.grid(row=2, column=0, columnspan=3, pady=10)
 
-    # Voeg een knop toe om led uit te zetten
-    ledoff = tk.Button(root, text="LED off", command=led_off)
-    ledoff.pack(pady=5)
+    # Define button size
+    button_width = 25
+    button_height = 2
 
-    # Voeg een knop toe om pr te initialiseren
-    global prinit
-    prinit = tk.Button(root, text="initialize Provisioner", command=init_pr)
-    prinit.pack(pady=5)
+    # Button styles (lighter black background and white text)
+    button_style = {'width': button_width, 'height': button_height, 'font': ('Helvetica', 12, 'bold'), 'bg': '#333333', 'fg': 'white'}
 
-    # Voeg een knop toe om appkey toe te voegen aan netwerk
-    addkey = tk.Button(root, text="add appkey", command=appkey_add)
-    addkey.pack(pady=5)
+    # Add buttons in a grid layout
+    remove_button = tk.Button(button_frame, text="Verwijder Geselecteerde Node", command=remove_node, **button_style)
+    remove_button.grid(row=0, column=0, padx=5, pady=5)
 
-    # Voeg een knop toe om appkey toe te voegen aan netwerk
-    givekey = tk.Button(root, text="reconnect_provisioner", command=reconnect_provisioner)
-    givekey.pack(pady=5)
+    ledon = tk.Button(button_frame, text="LED on", command=led_on, **button_style)
+    ledon.grid(row=0, column=1, padx=5, pady=5)
 
-     # Voeg een knop toe om group aan te maken
-    creategroup = tk.Button(root, text="create group", command=create_group)
-    creategroup.pack(pady=5)
+    ledoff = tk.Button(button_frame, text="LED off", command=led_off, **button_style)
+    ledoff.grid(row=0, column=2, padx=5, pady=5)
 
-    # Voeg een knop toe om appkey toe voor remote provision
-    remoteprov = tk.Button(root, text="remote prov", command=remote_prov)
-    remoteprov.pack(pady=5)
+    prinit = tk.Button(button_frame, text="Initialize Provisioner", command=init_pr, **button_style)
+    prinit.grid(row=1, column=0, padx=5, pady=5)
 
-    # Voeg een knop toe om het venster af te sluiten
-    quit_button = tk.Button(root, text="Afsluiten", command=root.quit)
-    quit_button.pack(pady=5)
+    addkey = tk.Button(button_frame, text="Add AppKey", command=appkey_add, **button_style)
+    addkey.grid(row=1, column=1, padx=5, pady=5)
 
-    # Serial Output
+    givekey = tk.Button(button_frame, text="Reconnect Provisioner", command=reconnect_provisioner, **button_style)
+    givekey.grid(row=1, column=2, padx=5, pady=5)
+
+    creategroup = tk.Button(button_frame, text="Create Group", command=create_group, **button_style)
+    creategroup.grid(row=2, column=0, padx=5, pady=5)
+
+    subgroup = tk.Button(button_frame, text="Subscribe Node to Group", command=sub_group, **button_style)
+    subgroup.grid(row=2, column=1, padx=5, pady=5)
+
+    remoteprov = tk.Button(button_frame, text="Remote Provisioning", command=remote_prov, **button_style)
+    remoteprov.grid(row=2, column=2, padx=5, pady=5)
+
+    getstatus = tk.Button(button_frame, text="Get Status", command=get_status, **button_style)
+    getstatus.grid(row=3, column=0, columnspan=2, padx=5, pady=5)
+
+    quit_button = tk.Button(button_frame, text="Afsluiten", command=root.quit, **button_style)
+    quit_button.grid(row=3, column=1, columnspan=2, padx=5, pady=5)
+
+    # Output text area
     global output_text
-    output_text = tk.Text(root, height=40, width=150)
-    output_text.pack(pady=10)
+    output_text = tk.Text(root, height=10, width=80, bg='#222222', fg='white', font=('Helvetica', 12))
+    output_text.grid(row=4, column=0, columnspan=3, padx=10, pady=30)
 
-    # Start de GUI-lus
+    # Start the GUI loop
     root.mainloop()
 
 if __name__ == "__main__":
