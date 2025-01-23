@@ -141,8 +141,10 @@ static int gen_onoff_set(const struct bt_mesh_model *model,
     printk("OnOff Set: Setting LED state to %u\n", new_state);
 
     state->current = new_state;
-    onoff.val = new_state;
+    onoff.val = new_state;  // Synchronize the `onoff.val` with the new state
     gpio_pin_set_dt(&state->led_device, state->current);
+
+    // Send status only once
     onoff_status_send(model, ctx);
 
     return 0;
@@ -152,16 +154,25 @@ static int gen_onoff_status(const struct bt_mesh_model *model,
                             struct bt_mesh_msg_ctx *ctx,
                             struct net_buf_simple *buf)
 {
-	uint8_t present = net_buf_simple_pull_u8(buf);
-	printk("Received OnOff Status: %s\n", present ? "ON" : "OFF");
-    struct led_onoff_state *state = &led_onoff_state;
+    uint8_t present = net_buf_simple_pull_u8(buf);
 
-    if (buf->len >= 2) { 
+    // Log the received OnOff status
+    printk("Received OnOff Status: %s\n", present ? "ON" : "OFF");
+
+    if (buf->len >= 2) {  // Handle optional Target and Remaining Time
         uint8_t target = net_buf_simple_pull_u8(buf);
-        uint32_t remaining_time = model_time_decode(net_buf_simple_pull_u8(buf));
+        uint8_t remaining_time = 0;
 
-        printk("Target: %s, Remaining Time: %u ms\n",
-               target ? "ON" : "OFF", remaining_time);
+        if (buf->len >= 1) {
+            remaining_time = net_buf_simple_pull_u8(buf);
+        }
+
+        printk("OnOff status: %s -> %s (Remaining time: %d ms)\n",
+               present ? "ON" : "OFF",
+               target ? "ON" : "OFF",
+               model_time_decode(remaining_time));
+    } else {
+        printk("OnOff status: %s\n", present ? "ON" : "OFF");
     }
 
     return 0;
