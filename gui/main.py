@@ -2,27 +2,27 @@ import tkinter as tk
 import serial
 import threading
 import time
-from serial.tools import list_ports
 
-ser = serial.Serial('COM16', 115200, timeout=1)
-
-next_address = 0x0010  # Eerste beschikbare address
-next_group = 0xc000 # Eerste beschikbare group address
-node_count = 1
-group_count = 1
-selected_address = None  # Variabele om geselecteerd adres op te slaan
-selected_group = None  # Variabele om geselecteerd adres op te slaan
-
+<<<<<<< HEAD
 # def send_command():
 #     command = command_entry.get()
 #     if command:
 #         # Start een nieuwe thread voor het verzenden van het command
 #         threading.Thread(target=send_serial_command, args=(command,)).start()
+=======
+ser = serial.Serial('COM0', 115200, timeout=1)
+
+def send_command():
+    command = command_entry.get()
+    if command:
+        # Start een nieuwe thread voor het verzenden van het command
+        threading.Thread(target=send_serial_command, args=(command,)).start()
+        node_entry.delete(0, tk.END)  # Maak het invoerveld leeg
+>>>>>>> parent of 3cf4394 (update function calls)
 
 def send_serial_command(command):
     """Functie om een command via de seriële poort te verzenden."""
     ser.write((command + "\r\n").encode('utf-8'))
-    ser.flush()  # Zorgt ervoor dat de buffer wordt geleegd en de data meteen wordt verzonden
     print(f"Verzonden: {command}")
     time.sleep(0.1)  # Simuleer enige verwerkingstijd
 
@@ -31,17 +31,18 @@ def send_serial_command(command):
         output_text.insert(tk.END, f"Response: {response}\n")
     else:
         output_text.insert(tk.END, "No response from device\n")
-                           
-                           
+
 def close_serial():
     ser.close()
     print("Seriele poort gesloten.")
 
-def add_node(node_name, address):
-    """Voegt een node toe aan de lijstbox en slaat het adres op."""
-    if node_name:
-        node_listbox.insert(tk.END, f"{node_name} ({address})")  # Voeg adres toe aan lijst
+def add_node():
+    node_name = node_entry.get()  # Haal de invoer van de gebruiker op
+    if node_name:  # Controleer of de invoer niet leeg is
+        node_listbox.insert(tk.END, node_name)  # Voeg de node toe aan de lijstbox
+        node_entry.delete(0, tk.END)  # Maak het invoerveld leeg
 
+<<<<<<< HEAD
 def reset_serial_buffers():
     try:
         ser.reset_input_buffer()
@@ -62,6 +63,8 @@ def create_group():
     group_listbox.insert(tk.END, f"group{group_count}: ({group_str})")  # Voeg adres toe aan lijst
     group_count += 1
     next_group += 1
+=======
+>>>>>>> parent of 3cf4394 (update function calls)
 
 def sub_group():
     global selected_address
@@ -74,35 +77,6 @@ def remove_node():
     selected_node = node_listbox.curselection()  # Haal de geselecteerde node op
     if selected_node:
         node_listbox.delete(selected_node)  # Verwijder de geselecteerde node
-    send_serial_command("mesh models cfg reset") #unprovision de node
-
-def on_node_select(event):
-    """Functie die wordt aangeroepen wanneer een node wordt geselecteerd."""
-    global selected_address
-
-    selected_index = node_listbox.curselection()
-    if selected_index:
-        selected_node = node_listbox.get(selected_index[0])
-        
-        # Extract het adres uit de string "Node: 0x0002" → "0x0002"
-        address = selected_node.split("(")[-1].strip(")")
-        selected_address = str(address)  # Opslaan voor gebruik
-        sending = f"mesh target dst {selected_address}"
-        send_serial_command(sending)
-
-def on_group_select(event):
-    """Functie die wordt aangeroepen wanneer een node wordt geselecteerd."""
-    global selected_group
-
-    selected_index = group_listbox.curselection()
-    if selected_index:
-        selected_group = group_listbox.get(selected_index[0])
-        
-        # Extract het adres uit de string "Node: 0x0002" → "0x0002"
-        address = selected_group.split("(")[-1].strip(")")
-        selected_group = address  # Opslaan voor gebruik
-        sending = f"mesh target dst {selected_group}"
-        send_serial_command(sending)
 
 def on_model_select(event):
     """Functie die wordt aangeroepen wanneer een node wordt geselecteerd."""
@@ -117,9 +91,11 @@ def on_model_select(event):
         selected_model = address  # Opslaan voor gebruik
 
 
-def led_on():
-    send_serial_command("mesh test net-send 82020100") #led on 
+def gen_server_on():
+        send_serial_command("Mesh target dst <address>")
+        send_serial_command("Mesh test net-send 82020100")
 
+<<<<<<< HEAD
 def led_off():
     send_serial_command("mesh test net-send 82020000") #led off
 
@@ -216,14 +192,22 @@ def remote_prov():
 
     add_node(f"node{node_count}:", f"{address_str}")  
     next_address += 1  # Increment the address for the next node
+=======
+def gen_server_off():
+        send_serial_command("toggle")
+>>>>>>> parent of 3cf4394 (update function calls)
 
 def main():
     root = tk.Tk()
     root.title("TUI Domotica 2024/2025")
+<<<<<<< HEAD
     root.geometry("1000x800")  # Set the window size
     
     # Set black background for the window
     root.configure(bg='#222222')
+=======
+    root.geometry("400x350")  # Stel de grootte van het venster in
+>>>>>>> parent of 3cf4394 (update function calls)
 
     root.grid_rowconfigure(0, weight=0)  # Top space (label)
     root.grid_rowconfigure(1, weight=0)  # Listboxes
@@ -239,6 +223,7 @@ def main():
     label = tk.Label(root, text="TUI Domotica 2024/2025", font=('Helvetica', 20, 'bold'), fg='white', bg='#222222')
     label.grid(row=0, column=0, columnspan=3, pady=10)
 
+<<<<<<< HEAD
     # Create a frame for the Listboxes
     listbox_frame = tk.Frame(root, bg='#222222')
     listbox_frame.grid(row=1, column=0, columnspan=3, padx=10, pady=10)
@@ -254,6 +239,26 @@ def main():
     group_listbox = tk.Listbox(listbox_frame, height=10, width=30, bg='#222222', fg='white')
     group_listbox.grid(row=0, column=1, padx=5, pady=5)
     group_listbox.bind("<<ListboxSelect>>", on_group_select)
+=======
+    # Voeg een lijstbox toe om nodes weer te geven
+    global node_listbox  # Maak de lijstbox globaal beschikbaar
+    node_listbox = tk.Listbox(root, height=8, width=40)
+    node_listbox.pack(pady=10)
+
+    # Voeg een invoerveld toe voor node naam
+    global node_entry  # Maak het invoerveld globaal beschikbaar
+    node_entry = tk.Entry(root, width=30)
+    node_entry.pack(pady=5)
+
+    # Serial Output
+    global output_text
+    output_text = tk.Text(root, height=10, width=50)
+    output_text.pack(pady=10)
+
+    # Voeg een knop toe om een node toe te voegen aan de lijstbox
+    add_button = tk.Button(root, text="Voeg Node Toe", command=add_node)
+    add_button.pack(pady=5)
+>>>>>>> parent of 3cf4394 (update function calls)
 
     # Add a Listbox to display models
     global model_listbox
@@ -261,6 +266,7 @@ def main():
     model_listbox.grid(row=0, column=2, padx=5, pady=5)
     model_listbox.bind("<<ListboxSelect>>", on_model_select)
 
+<<<<<<< HEAD
     # Create a frame for the buttons
     button_frame = tk.Frame(root, bg='#222222')
     button_frame.grid(row=2, column=0, columnspan=3, pady=10)
@@ -310,6 +316,19 @@ def main():
     global output_text
     output_text = tk.Text(root, height=10, width=80, bg='#222222', fg='white', font=('Helvetica', 12))
     output_text.grid(row=4, column=0, columnspan=3, padx=10, pady=30)
+=======
+    # Voeg een knop toe om het venster af te sluiten
+    quit_button = tk.Button(root, text="Afsluiten", command=root.quit)
+    quit_button.pack(pady=5)
+
+    # Voeg een knop toe om led 1 aan te zetten
+    led2 = tk.Button(root, text="TURN LED ON", command=gen_server_on)
+    led2.pack(pady=5)
+
+    # Voeg een knop toe om led 1 aan te zetten
+    led0 = tk.Button(root, text="TURN LED OFF", command=gen_server_off)
+    led0.pack(pady=5)
+>>>>>>> parent of 3cf4394 (update function calls)
 
     # Start the GUI loop
     root.mainloop()
