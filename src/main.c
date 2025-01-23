@@ -49,21 +49,21 @@ static struct led_onoff_state led_onoff_state = {
     .previous = 0,
 };
 
-static uint8_t dev_uuid[16] = {
-    0x66, 0x66, 0x66, 0x66,
-    0x90, 0xAB, 0xCD, 0xEF,
-    0x01, 0x23, 0x45, 0x67,
-    0x89, 0xAB, 0xCD, 0xEF
-};
+// static uint8_t dev_uuid[16] = {
+//     0x66, 0x66, 0x66, 0x66,
+//     0x90, 0xAB, 0xCD, 0xEF,
+//     0x01, 0x23, 0x45, 0x67,
+//     0x89, 0xAB, 0xCD, 0xEF
+// };
 
-static struct bt_mesh_prov prov = {
-    .uuid = dev_uuid,  // Set the UUID here
-    .output_number = NULL,
-    .output_string = NULL,
-    .input = NULL,
-    .complete = NULL,
-    .reset = NULL,
-};
+// static struct bt_mesh_prov prov = {
+//     .uuid = dev_uuid,  // Set the UUID here
+//     .output_number = NULL,
+//     .output_string = NULL,
+//     .input = NULL,
+//     .complete = NULL,
+//     .reset = NULL,
+// };
 
 static const struct gpio_dt_spec button_device = GPIO_DT_SPEC_GET(DT_ALIAS(sw0), gpios);
 static struct gpio_callback button_cb;
@@ -411,7 +411,7 @@ static void bt_ready(int err)
 
 	printk("Bluetooth initialized\n");
 
-	err = bt_mesh_init(&prov, &comp);
+	err = bt_mesh_init(&bt_mesh_shell_prov, &comp);
 	if (err) {
 		printk("Initializing mesh failed (err %d)\n", err);
 		return;
